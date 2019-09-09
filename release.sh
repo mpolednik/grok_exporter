@@ -2,7 +2,7 @@
 
 set -e
 
-if [[ $(go version) != *"go1.11"* && $(go version) != *"go1.12"* ]] ; then
+if [[ $(go version) != *"go1.11"* && $(go version) != *"go1.12"* && $(go version) != *"go1.13"* ]] ; then
     echo "grok_exporter uses Go 1.11 Modules. Please use Go version >= 1.11." >&2
     echo "Version found is $(go version)" >&2
     exit 1
@@ -79,6 +79,14 @@ function create_zip_file {
     cd ..
 }
 
+function run_linux_amd64 {
+    cd /go/src/github.com/fstab/grok_exporter
+    export CGO_LDFLAGS=/usr/local/lib/libonig.a
+    export GO111MODULE=off # use vendor instead
+    echo go version: $(go version)
+    go build -ldflags "$VERSION_FLAGS" -o "dist/grok_exporter" .
+}
+
 function run_docker_linux_amd64 {
     docker run \
         -v $GOPATH/src/github.com/fstab/grok_exporter:/go/src/github.com/fstab/grok_exporter \
@@ -118,6 +126,12 @@ function run_docker_linux_arm32v6 {
 #--------------------------------------------------------------
 # Release functions
 #--------------------------------------------------------------
+
+function release_linux_amd64_dockerhub {
+    echo "Building dist/grok_exporter-$VERSION.linux-amd64.zip"
+    enable_legacy_static_linking
+    run_linux_amd64
+}
 
 function release_linux_amd64 {
     echo "Building dist/grok_exporter-$VERSION.linux-amd64.zip"
@@ -164,6 +178,13 @@ function release_darwin_amd64 {
 #--------------------------------------------------------------
 
 case $1 in
+     dockerhub-linux-amd64)
+        rm -rf dist/grok_exporter-*.linux-amd64*
+        run_tests
+        create_vendor
+        release_linux_amd64_dockerhub
+        remove_vendor
+        ;;
     linux-amd64)
         rm -rf dist/grok_exporter-*.linux-amd64*
         run_tests
